@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, Download, Grid, Image as ImageIcon, Settings, Eye } from "lucide-react";
+import { Upload, Download, Grid, Image as ImageIcon, Settings, Eye, RotateCcw, Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 
@@ -19,11 +21,24 @@ interface ImageData {
   height: number;
 }
 
+type PaperFormat = 'a4' | 'letter' | 'a3' | 'tabloid';
+type Orientation = 'portrait' | 'landscape';
+
+const PAPER_FORMATS = {
+  a4: { width: 210, height: 297, name: 'A4' },
+  letter: { width: 216, height: 279, name: 'Carta (Letter)' },
+  a3: { width: 297, height: 420, name: 'A3' },
+  tabloid: { width: 279, height: 432, name: 'Tabloid' }
+};
+
 export const PosterCreator = () => {
   const [imageData, setImageData] = useState<ImageData | null>(null);
   const [gridConfig, setGridConfig] = useState<GridConfig>({ horizontal: 2, vertical: 2 });
   const [previewData, setPreviewData] = useState<string[]>([]);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
+  const [paperFormat, setPaperFormat] = useState<PaperFormat>('a4');
+  const [orientation, setOrientation] = useState<Orientation>('portrait');
+  const [showGuideLines, setShowGuideLines] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -103,49 +118,108 @@ export const PosterCreator = () => {
       return;
     }
 
-    const pdf = new jsPDF();
+    const paperConfig = PAPER_FORMATS[paperFormat];
+    const isLandscape = orientation === 'landscape';
+    
+    // Configurar o PDF com formato e orientação
+    const pdf = new jsPDF({
+      orientation: orientation,
+      unit: 'mm',
+      format: [paperConfig.width, paperConfig.height]
+    });
+
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
+    const margin = 15;
     const maxWidth = pageWidth - 2 * margin;
     const maxHeight = pageHeight - 2 * margin;
+
+    // Informações do grid para as marcações
+    const totalCols = gridConfig.horizontal;
+    const totalRows = gridConfig.vertical;
 
     for (let i = 0; i < previewData.length; i++) {
       if (i > 0) {
         pdf.addPage();
       }
 
-      // Adicionar número da página
-      pdf.setFontSize(12);
-      pdf.text(`Página ${i + 1} de ${previewData.length}`, margin, margin);
+      // Calcular posição no grid (qual linha e coluna)
+      const col = i % totalCols;
+      const row = Math.floor(i / totalCols);
+
+      // Cabeçalho com informações
+      pdf.setFontSize(10);
+      pdf.setTextColor(100);
+      pdf.text(`Página ${i + 1} de ${previewData.length}`, margin, margin - 5);
+      pdf.text(`Grid: ${col + 1},${row + 1} | ${paperConfig.name} ${orientation === 'portrait' ? 'Retrato' : 'Paisagem'}`, pageWidth - 60, margin - 5);
       
       // Calcular posição e tamanho da imagem
       const imgData = previewData[i];
       const aspectRatio = imageData!.width / gridConfig.horizontal / (imageData!.height / gridConfig.vertical);
       
       let imgWidth, imgHeight;
-      if (aspectRatio > maxWidth / maxHeight) {
+      const availableHeight = maxHeight - 25; // Espaço para cabeçalho e instruções
+      
+      if (aspectRatio > maxWidth / availableHeight) {
         imgWidth = maxWidth;
         imgHeight = maxWidth / aspectRatio;
       } else {
-        imgHeight = maxHeight - 20; // Espaço para o texto
-        imgWidth = imgHeight * aspectRatio;
+        imgHeight = availableHeight;
+        imgWidth = availableHeight * aspectRatio;
       }
 
       const x = (pageWidth - imgWidth) / 2;
-      const y = margin + 20;
+      const y = margin + 15;
 
+      // Adicionar imagem
       pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
       
-      // Adicionar linha guia opcional
-      pdf.setDrawColor(200, 200, 200);
-      pdf.setLineWidth(0.1);
-      pdf.rect(x - 2, y - 2, imgWidth + 4, imgHeight + 4);
+      // Adicionar linhas guia se habilitadas
+      if (showGuideLines) {
+        pdf.setDrawColor(150, 150, 150);
+        pdf.setLineWidth(0.2);
+        
+        // Borda principal
+        pdf.rect(x - 3, y - 3, imgWidth + 6, imgHeight + 6);
+        
+        // Marcações de corte nos cantos
+        const markSize = 5;
+        pdf.setLineWidth(0.3);
+        
+        // Canto superior esquerdo
+        pdf.line(x - 8, y - 3, x - 3, y - 3);
+        pdf.line(x - 3, y - 8, x - 3, y - 3);
+        
+        // Canto superior direito
+        pdf.line(x + imgWidth + 3, y - 8, x + imgWidth + 3, y - 3);
+        pdf.line(x + imgWidth + 3, y - 3, x + imgWidth + 8, y - 3);
+        
+        // Canto inferior esquerdo
+        pdf.line(x - 8, y + imgHeight + 3, x - 3, y + imgHeight + 3);
+        pdf.line(x - 3, y + imgHeight + 3, x - 3, y + imgHeight + 8);
+        
+        // Canto inferior direito
+        pdf.line(x + imgWidth + 3, y + imgHeight + 3, x + imgWidth + 8, y + imgHeight + 3);
+        pdf.line(x + imgWidth + 3, y + imgHeight + 8, x + imgWidth + 3, y + imgHeight + 3);
+        
+        // Linha central para alinhamento
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.1);
+        pdf.line(pageWidth / 2, y - 5, pageWidth / 2, y + imgHeight + 5);
+        pdf.line(x - 5, pageHeight / 2, x + imgWidth + 5, pageHeight / 2);
+      }
+
+      // Instruções na parte inferior
+      pdf.setFontSize(8);
+      pdf.setTextColor(120);
+      const instructions = `Posição: Coluna ${col + 1}, Linha ${row + 1} | Cole as páginas seguindo a ordem numérica`;
+      pdf.text(instructions, pageWidth / 2, pageHeight - 5, { align: 'center' });
     }
 
-    pdf.save(`poster-${gridConfig.horizontal}x${gridConfig.vertical}.pdf`);
+    const filename = `poster-${gridConfig.horizontal}x${gridConfig.vertical}-${paperFormat}-${orientation}.pdf`;
+    pdf.save(filename);
     toast.success("PDF gerado e baixado!");
-  }, [previewData, gridConfig, imageData]);
+  }, [previewData, gridConfig, imageData, paperFormat, orientation, showGuideLines]);
 
   const dragHandlers = {
     onDragOver: (e: React.DragEvent) => {
@@ -273,6 +347,69 @@ export const PosterCreator = () => {
                 </div>
               </div>
 
+              {/* Configurações de Impressão */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Ruler className="h-4 w-4" />
+                  <Label className="font-medium">Configurações de Impressão</Label>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="paperFormat">Formato do Papel</Label>
+                    <Select value={paperFormat} onValueChange={(value: PaperFormat) => setPaperFormat(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PAPER_FORMATS).map(([key, format]) => (
+                          <SelectItem key={key} value={key}>
+                            {format.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="orientation">Orientação</Label>
+                    <Select value={orientation} onValueChange={(value: Orientation) => setOrientation(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="portrait">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-4 border border-current"></div>
+                            Retrato
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="landscape">
+                          <div className="flex items-center gap-2">
+                            <RotateCcw className="h-3 w-3" />
+                            Paisagem
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="guidelines">Linhas Guia</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Adicionar marcações para recorte e montagem
+                    </p>
+                  </div>
+                  <Switch
+                    id="guidelines"
+                    checked={showGuideLines}
+                    onCheckedChange={setShowGuideLines}
+                  />
+                </div>
+              </div>
+
               <div className="p-4 bg-accent rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <Grid className="h-4 w-4" />
@@ -280,6 +417,9 @@ export const PosterCreator = () => {
                 </div>
                 <p className="text-2xl font-bold text-primary">
                   {gridConfig.horizontal * gridConfig.vertical}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {PAPER_FORMATS[paperFormat].name} • {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}
                 </p>
               </div>
 
