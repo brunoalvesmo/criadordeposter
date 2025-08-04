@@ -1,11 +1,10 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, Download, Grid, Image as ImageIcon, Settings, Eye, RotateCcw, Ruler } from "lucide-react";
+import { Upload, Download, Grid, Image as ImageIcon, Settings, Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 
@@ -38,7 +37,6 @@ export const PosterCreator = () => {
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
   const [paperFormat, setPaperFormat] = useState<PaperFormat>('a4');
   const [orientation, setOrientation] = useState<Orientation>('portrait');
-  const [showGuideLines, setShowGuideLines] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -119,7 +117,6 @@ export const PosterCreator = () => {
     }
 
     const paperConfig = PAPER_FORMATS[paperFormat];
-    const isLandscape = orientation === 'landscape';
     
     // Configurar o PDF com formato e orientação
     const pdf = new jsPDF({
@@ -130,11 +127,11 @@ export const PosterCreator = () => {
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 5; // Margem mínima para impressão
     const maxWidth = pageWidth - 2 * margin;
     const maxHeight = pageHeight - 2 * margin;
 
-    // Informações do grid para as marcações
+    // Informações do grid
     const totalCols = gridConfig.horizontal;
     const totalRows = gridConfig.vertical;
 
@@ -146,80 +143,40 @@ export const PosterCreator = () => {
       // Calcular posição no grid (qual linha e coluna)
       const col = i % totalCols;
       const row = Math.floor(i / totalCols);
-
-      // Cabeçalho com informações
-      pdf.setFontSize(10);
-      pdf.setTextColor(100);
-      pdf.text(`Página ${i + 1} de ${previewData.length}`, margin, margin - 5);
-      pdf.text(`Grid: ${col + 1},${row + 1} | ${paperConfig.name} ${orientation === 'portrait' ? 'Retrato' : 'Paisagem'}`, pageWidth - 60, margin - 5);
       
-      // Calcular posição e tamanho da imagem
+      // Calcular posição e tamanho da imagem para ocupar o máximo da página
       const imgData = previewData[i];
       const aspectRatio = imageData!.width / gridConfig.horizontal / (imageData!.height / gridConfig.vertical);
       
       let imgWidth, imgHeight;
-      const availableHeight = maxHeight - 25; // Espaço para cabeçalho e instruções
       
-      if (aspectRatio > maxWidth / availableHeight) {
+      // Maximizar o uso da página
+      if (aspectRatio > maxWidth / maxHeight) {
         imgWidth = maxWidth;
         imgHeight = maxWidth / aspectRatio;
       } else {
-        imgHeight = availableHeight;
-        imgWidth = availableHeight * aspectRatio;
+        imgHeight = maxHeight;
+        imgWidth = maxHeight * aspectRatio;
       }
 
+      // Centralizar a imagem na página
       const x = (pageWidth - imgWidth) / 2;
-      const y = margin + 15;
+      const y = (pageHeight - imgHeight) / 2;
 
-      // Adicionar imagem
+      // Adicionar imagem ocupando o máximo da página
       pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-      
-      // Adicionar linhas guia se habilitadas
-      if (showGuideLines) {
-        pdf.setDrawColor(150, 150, 150);
-        pdf.setLineWidth(0.2);
-        
-        // Borda principal
-        pdf.rect(x - 3, y - 3, imgWidth + 6, imgHeight + 6);
-        
-        // Marcações de corte nos cantos
-        const markSize = 5;
-        pdf.setLineWidth(0.3);
-        
-        // Canto superior esquerdo
-        pdf.line(x - 8, y - 3, x - 3, y - 3);
-        pdf.line(x - 3, y - 8, x - 3, y - 3);
-        
-        // Canto superior direito
-        pdf.line(x + imgWidth + 3, y - 8, x + imgWidth + 3, y - 3);
-        pdf.line(x + imgWidth + 3, y - 3, x + imgWidth + 8, y - 3);
-        
-        // Canto inferior esquerdo
-        pdf.line(x - 8, y + imgHeight + 3, x - 3, y + imgHeight + 3);
-        pdf.line(x - 3, y + imgHeight + 3, x - 3, y + imgHeight + 8);
-        
-        // Canto inferior direito
-        pdf.line(x + imgWidth + 3, y + imgHeight + 3, x + imgWidth + 8, y + imgHeight + 3);
-        pdf.line(x + imgWidth + 3, y + imgHeight + 8, x + imgWidth + 3, y + imgHeight + 3);
-        
-        // Linha central para alinhamento
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.1);
-        pdf.line(pageWidth / 2, y - 5, pageWidth / 2, y + imgHeight + 5);
-        pdf.line(x - 5, pageHeight / 2, x + imgWidth + 5, pageHeight / 2);
-      }
 
-      // Instruções na parte inferior
+      // Adicionar informações discretas no canto
       pdf.setFontSize(8);
       pdf.setTextColor(120);
-      const instructions = `Posição: Coluna ${col + 1}, Linha ${row + 1} | Cole as páginas seguindo a ordem numérica`;
-      pdf.text(instructions, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      pdf.text(`${i + 1}/${previewData.length}`, pageWidth - 15, 10);
+      pdf.text(`${col + 1},${row + 1}`, pageWidth - 15, 18);
     }
 
     const filename = `poster-${gridConfig.horizontal}x${gridConfig.vertical}-${paperFormat}-${orientation}.pdf`;
     pdf.save(filename);
     toast.success("PDF gerado e baixado!");
-  }, [previewData, gridConfig, imageData, paperFormat, orientation, showGuideLines]);
+  }, [previewData, gridConfig, imageData, paperFormat, orientation]);
 
   const dragHandlers = {
     onDragOver: (e: React.DragEvent) => {
@@ -350,7 +307,7 @@ export const PosterCreator = () => {
               {/* Configurações de Impressão */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Ruler className="h-4 w-4" />
+                  <Settings className="h-4 w-4" />
                   <Label className="font-medium">Configurações de Impressão</Label>
                 </div>
                 
@@ -394,20 +351,6 @@ export const PosterCreator = () => {
                     </Select>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="guidelines">Linhas Guia</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Adicionar marcações para recorte e montagem
-                    </p>
-                  </div>
-                  <Switch
-                    id="guidelines"
-                    checked={showGuideLines}
-                    onCheckedChange={setShowGuideLines}
-                  />
-                </div>
               </div>
 
               <div className="p-4 bg-accent rounded-lg">
@@ -420,6 +363,9 @@ export const PosterCreator = () => {
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {PAPER_FORMATS[paperFormat].name} • {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}
+                </p>
+                <p className="text-xs text-success mt-1 font-medium">
+                  Imagem maximizada em cada página
                 </p>
               </div>
 
