@@ -404,24 +404,41 @@ export const PosterCreator = () => {
               {previewData.length > 0 ? (
                 <div className="space-y-4">
                   <div className="grid gap-2" style={gridStyle}>
-                    {previewData.map((piece, index) => (
-                      <div
-                        key={index}
-                        className="relative aspect-square border-2 border-border rounded-lg overflow-hidden cursor-pointer hover:border-primary transition-colors"
-                        onClick={() => setSelectedPreview(index)}
-                      >
-                        <img
-                          src={piece}
-                          alt={`Página ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                          <span className="text-white text-xs font-medium">
-                            Página {index + 1}
-                          </span>
+                    {previewData.map((piece, index) => {
+                      // Calcular proporção da página baseada no formato e orientação
+                      const paperConfig = PAPER_FORMATS[paperFormat];
+                      const pageWidth = orientation === 'portrait' ? paperConfig.width : paperConfig.height;
+                      const pageHeight = orientation === 'portrait' ? paperConfig.height : paperConfig.width;
+                      const pageAspectRatio = pageWidth / pageHeight;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="relative border-2 border-border rounded-lg overflow-hidden cursor-pointer hover:border-primary transition-colors bg-white"
+                          style={{ aspectRatio: pageAspectRatio }}
+                          onClick={() => setSelectedPreview(index)}
+                        >
+                          {/* Simular papel */}
+                          <div className="absolute inset-1 bg-white border border-gray-200 rounded flex items-center justify-center">
+                            <img
+                              src={piece}
+                              alt={`Página ${index + 1}`}
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                          
+                          {/* Overlay com informações */}
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                            <span className="text-white text-xs font-medium mb-1">
+                              Página {index + 1}
+                            </span>
+                            <span className="text-white text-xs">
+                              {PAPER_FORMATS[paperFormat].name} - {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   {selectedPreview !== null && (
