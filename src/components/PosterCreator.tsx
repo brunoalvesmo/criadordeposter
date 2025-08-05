@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 
 interface GridConfig {
   horizontal: number;
@@ -204,17 +206,20 @@ export const PosterCreator = () => {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-background via-accent/20 to-background">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-            Criador de Pôsteres
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Divida sua imagem em múltiplas páginas para criar pôsteres impressos
-          </p>
-        </div>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      
+      <main className="flex-1 p-6 bg-gradient-to-br from-background via-accent/20 to-background">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Título da Seção */}
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+              Configure seu Pôster
+            </h2>
+            <p className="text-muted-foreground text-lg">
+              Faça o upload da imagem e defina como deseja dividir em páginas
+            </p>
+          </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Upload Section */}
@@ -462,9 +467,12 @@ export const PosterCreator = () => {
           </Card>
         </div>
 
-        {/* Hidden Canvas */}
-        <canvas ref={canvasRef} className="hidden" />
-      </div>
+          {/* Hidden Canvas */}
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
